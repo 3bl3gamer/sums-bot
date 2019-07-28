@@ -1,12 +1,14 @@
-import db_sqlite, httpClient, options, asyncdispatch, parseopt, os, strutils, sequtils
+import db_sqlite, httpClient, options, asyncdispatch, parseopt, os, strutils,
+    sequtils, json, tables
 import httpbeast
 import tg, core
 
 var httpProxyAddr = ""
+var webhookCertPath = ""
+var webhookUrl = ""
 let token = getEnv("TG_BOT_TOKEN")
+# openssl req -newkey rsa:2048 -sha256 -nodes -keyout sums_bot_key.pem -x509 -days 3650 -out sums_bot_cert.pem -subj "/CN=127.0.0.1"
 
-if token == "":
-  raise newException(Exception, "TG_BOT_TOKEN env variable is missing")
 
 var p = initOptParser(commandLineParams())
 while true:
@@ -16,8 +18,19 @@ while true:
   of cmdShortOption, cmdLongOption:
     if p.key == "http-proxy-addr":
       httpProxyAddr = p.val
+    elif p.key == "webhook-cert-path":
+      webhookCertPath = p.val
+    elif p.key == "webhook-url":
+      webhookUrl = p.val
   of cmdArgument:
     echo "unexpected argument: ", p.key
+
+
+if token == "":
+  raise newException(Exception, "TG_BOT_TOKEN env variable is missing")
+
+if (webhookCertPath == "") != (webhookUrl == ""):
+  raise newException(Exception, "webhook-cert-path and webhook-url must be both set or blank")
 
 
 let db = open("main.db", "", "", "")
@@ -113,21 +126,26 @@ proc onUpdate(bot: TGBot, update: Update) =
         answer(bot, user, "Не понял.")
 
 
-bot.startPollingThread(60, onUpdate, allowedUpdates = {UTMessage})
+if webhookCertPath == "" or webhookUrl == "":
+  discard bot.deleteWebhook()
+  # bot.startPollingThread(60, onUpdate, allowedUpdates = {UTMessage})
+  bot.startPoling(60, onUpdate, allowedUpdates = {UTMessage})
+else:
+  let cert = readFile(webhookCertPath)
+  discard bot.setWebhook(webhookUrl, some(cert), allowedUpdates = {UTMessage})
+  var bots = initTable[int, TGBot]()
 
-
-proc onRequest(req: Request): Future[void] =
-  if req.httpMethod == some(HttpGet):
-    case req.path.get()
-    of "/":
-      echo "start"
-      req.send("Hello World")
-      # sleep(5000)
-      db.exec(sql"UPDATE test_tbl SET count = count + 1")
-      for x in db.fastRows(sql"SELECT count FROM test_tbl"):
-        echo x
-      echo "end"
+  proc onRequest(req: Request): Future[void] =
+    if req.httpMethod == some(HttpPost) and req.path.get() == "/webhook":
+      let body = req.body()
+      if body.isSome:
+        let tid = getThreadId()
+        {.gcsafe.}:
+          let localBot = if bots.hasKey(tid): bots[tid]
+            else: bots.getOrDefault(tid, bot.copy())
+        onUpdate(localBot, parseJson(body.get()).to(Update))
+      req.send("OK")
     else:
       req.send(Http404)
 
-run(onRequest, Settings(port: Port(9003)))
+  run(onRequest, Settings(port: Port(9003)))

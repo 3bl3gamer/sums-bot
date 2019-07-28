@@ -26,13 +26,13 @@ type
     CTSupergroup = "supergroup"
     CTChannel = "channel"
   Chat* = object
-    id: int64                  # Unique identifier for this chat.
-    `type`: ChatType # Type of chat, can be either “private”, “group”, “supergroup” or “channel”
-    title: Option[string]      # Title, for supergroups, channels and group chats
-    username: Option[string] # Username, for private chats, supergroups and channels if available
-    first_name: Option[string] # First name of the other party in a private chat
-    last_name: Option[string]  # Last name of the other party in a private chat
-                               # ...
+    id*: int64                  # Unique identifier for this chat.
+    `type`*: ChatType # Type of chat, can be either “private”, “group”, “supergroup” or “channel”
+    title*: Option[string]      # Title, for supergroups, channels and group chats
+    username*: Option[string] # Username, for private chats, supergroups and channels if available
+    first_name*: Option[string] # First name of the other party in a private chat
+    last_name*: Option[string]  # Last name of the other party in a private chat
+                                # ...
 
   Message* = object
     message_id*: int64    # Unique message identifier inside this chat
@@ -56,7 +56,7 @@ type
     PMMarkdown = (1, "Markdown")
     PMHtml = (2, "HTML")
 
-  OnUpdate* = proc(bot:TGBot, update: Update) {.gcsafe.}
+  OnUpdate* = proc(bot: TGBot, update: Update) {.gcsafe.}
   PollThreadArgs = tuple[interval: int, allowedUpdates: set[UpdateType],
       token: string, proxy: Proxy, onUpdate: OnUpdate]
 
@@ -69,16 +69,28 @@ proc newTGBot*(token: string, proxy: Proxy = nil): TGBot =
   client.headers = newHttpHeaders({"Content-Type": "application/json"})
   return TGBot(token: token, client: client, proxy: proxy)
 
-proc sendRequest*(bot: TGBot, methodName: string,
+proc copy*(bot: TGBot): TGBot =
+  return newTGBot(bot.token, bot.proxy)
+
+proc handleResponse(bot: TGBot, body: string): Response =
+  debug ">", body
+  return parseJson(body).to(Response)
+
+proc sendRequest(bot: TGBot, methodName: string,
     params: JsonNode = nil): Response =
   let path = "https://api.telegram.org/bot" & bot.token & "/" & methodName
   # let resp = client.getContent(path)
   let reqBody = if params == nil: "" else: $params
   debug "<", methodName, reqBody
   let resp = bot.client.request(path, httpMethod = HttpPost, body = reqBody)
-  let respBody = resp.body()
-  debug ">", respBody
-  return parseJson(respBody).to(Response)
+  return handleResponse(bot, resp.body())
+
+proc sendMultipartRequest(bot: TGBot, methodName: string,
+    params: MultipartData): Response =
+  let path = "https://api.telegram.org/bot" & bot.token & "/" & methodName
+  debug "<", methodName, "<multipart>"
+  let respBody = bot.client.postContent(path, multipart = params)
+  return handleResponse(bot, respBody)
 
 proc getMe*(bot: TGBot): User =
   return bot.sendRequest("getMe").result.to(User)
@@ -115,6 +127,18 @@ proc sendMessage*(bot: TGBot, chatId: int64, text: string,
   if disableNotification: params["disable_notification"] = %* true
   if replyToMessageId != 0: params["reply_to_message_id"] = %* replyToMessageId
   return bot.sendRequest("sendMessage", params).result.to(Message)
+
+proc setWebhook*(bot: TGBot, url: string, cert: Option[string],
+    maxConnections: int = 0, allowedUpdates: set[UpdateType] = {}): bool =
+  var params = newMultipartData()
+  params["url"] = url
+  if cert.isSome: params["certificate"] = ("cert.pem", "text/plain", cert.get())
+  if maxConnections > 0: params["max_connections"] = $maxConnections
+  if allowedUpdates.card > 0: params["allowed_updates"] = $toSeq(allowedUpdates)
+  return sendMultipartRequest(bot, "setWebhook", params).result.to(bool)
+
+proc deleteWebhook*(bot: TGBot): bool =
+  return bot.sendRequest("deleteWebhook").result.to(bool)
 
 proc startPoling*(bot: TGBot, interval: int, onUpdate: OnUpdate,
     allowedUpdates: set[UpdateType] = {}) =
