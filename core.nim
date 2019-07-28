@@ -1,4 +1,4 @@
-import db_sqlite, strutils, times, options
+import db_sqlite, strutils, times, options, sequtils
 
 type
   LastSum = object
@@ -12,6 +12,13 @@ type
     curSumName*: string
     lastSum*: Option[LastSum]
     createdAt*: DateTime
+
+  Sum* = object
+    userId*: int64
+    name*: string
+    value*: int64
+    createdAt*: DateTime
+    updatedAt*: DateTime
 
 template inTransaction(db: DBConn, statements: untyped) =
   var ok = true
@@ -45,6 +52,15 @@ proc userFromRow(row: seq[string]): User =
     curSumName: row[4],
     lastSum: lastSum,
     createdAt: parse(row[7], "yyyy-MM-dd HH:mm:ss", zone = utc())
+  )
+
+proc sumFromRow(row: seq[string]): Sum =
+  return Sum(
+    userId: int64(parseInt(row[0])),
+    name: row[1],
+    value: int64(parseInt(row[2])),
+    createdAt: parse(row[3], "yyyy-MM-dd HH:mm:ss", zone = utc()),
+    updatedAt: parse(row[4], "yyyy-MM-dd HH:mm:ss", zone = utc())
   )
 
 proc setupTables*(db: DBConn) =
@@ -117,3 +133,19 @@ proc updateUserSum*(db: DBConn, userId: int64, sumName: string,
 
 proc changeUserCurSum*(db: DBConn, userId: int64, sumName: string) =
   db.exec(sql"UPDATE users SET cur_sum_name = ? WHERE id = ?", sumName, userId)
+
+proc removeUserSum*(db: DBConn, userId: int64, sumName: string): bool =
+  inTransaction(db):
+    db.exec(sql"""
+      UPDATE users SET last_sum_name = NULL, last_sum_delta = NULL
+      WHERE id = ? AND last_sum_name = ?
+      """, userId, sumName)
+    let numRows = db.execAffectedRows(sql"""
+      DELETE FROM sums WHERE user_id = ? AND name = ?
+      """, userId, sumName)
+    return numRows > 0
+
+proc findUserSums*(db: DBConn, userId: int64): seq[Sum] =
+  return db.getAllRows(sql"""
+    SELECT * FROM sums WHERE user_id = ? ORDER BY created_at
+    """, userId).map(sumFromRow)
