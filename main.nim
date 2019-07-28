@@ -41,14 +41,22 @@ proc onUpdate(update: Update) =
     let user = findOrAddUser(db, f.id, f.first_name, f.last_name, f.username)
     let text = msg.text.get()
 
-    if text.startsWith("/cancel"):
-      echo "cancel"
-    elif text.startsWith("/use"):
-      echo "use"
+    if text.startsWith("/start") or text.startsWith("/help"):
+      echo "start"
+    elif text.startsWith("/cancel"):
+      if user.lastSum.isSome:
+        updateUserSum(db, user.id, user.lastSum.get().name, -user.lastSum.get().delta)
+    elif text.startsWith("/use "):
+      changeUserCurSum(db, user.id, text[5 .. ^1].strip())
+    elif text.startsWith("/"):
+      echo "unknown command ", text
     else:
-      var value = try: some(parseInt(text)) except ValueError: none(int)
-      if value.isSome:
-        updateUserSum(db, user.id, user.curSumName, int64(value.get()))
+      let lines = text.split('\n', maxSplit = 2) # lines after first are ignored and may be used as comment
+      let parts = lines[0].rsplit(" ", maxSplit = 2)
+      let delta = try: some(int64(parseInt(parts[^1]))) except ValueError: none(int64)
+      let sumName = if parts.len == 1: user.curSumName else: parts[0]
+      if delta.isSome:
+        updateUserSum(db, user.id, sumName, delta.get())
       else:
         echo "unknown ", text
 

@@ -103,3 +103,7 @@ proc updateUserSum*(db: DBConn, userId: int64, sumName: string, delta: int64) =
     db.exec(sql"""
       UPDATE users SET last_sum_name = ?, last_sum_delta = ? WHERE id = ?
       """, sumName, delta, userId)
+
+
+proc changeUserCurSum*(db: DBConn, userId: int64, sumName: string) =
+  db.exec(sql"UPDATE users SET cur_sum_name = ? WHERE id = ?", sumName, userId)
