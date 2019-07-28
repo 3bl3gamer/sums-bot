@@ -1,6 +1,6 @@
-import db_sqlite, httpClient, options, asyncdispatch, parseopt, os
+import db_sqlite, httpClient, options, asyncdispatch, parseopt, os, strutils
 import httpbeast
-import tg
+import tg, core
 
 var httpProxyAddr = ""
 let token = getEnv("TG_BOT_TOKEN")
@@ -26,23 +26,35 @@ let proxy = if httpProxyAddr == "": nil else: newProxy(url = httpProxyAddr)
 let bot = newTGBot(token, proxy)
 
 
-db.exec(sql"""
-CREATE TABLE IF NOT EXISTS test_tbl (
-  id    INTEGER PRIMARY KEY,
-  text  TEXT,
-  count INT
-)""")
-# db.exec(sql"INSERT INTO test_tbl VALUES (1, 'qwe', 0), (2, 'asd', 1), (3, 'zxc', 0);")
+setupTables(db)
+echo "DB: users: ", countUsers(db), ", sums: ", countSums(db)
+
+let me = bot.getMe()
+echo "TG: starting as @", me.username.get(), " aka ", me.first_name, " #", me.id
 
 
 proc onUpdate(update: Update) =
   echo update
-  for r in db.fastRows(sql"SELECT count FROM test_tbl"):
-    echo r
-bot.startPollingThread(10, onUpdate, allowedUpdates = {UTMessage})
+  let msg = update.message
+  if msg.text.isSome:
+    let f = msg.`from`.get()
+    let user = findOrAddUser(db, f.id, f.first_name, f.last_name, f.username)
+    let text = msg.text.get()
 
-echo bot.getMe()
-# echo bot.getUpdates(allowedUpdates = {UTMessage})
+    if text.startsWith("/cancel"):
+      echo "cancel"
+    elif text.startsWith("/use"):
+      echo "use"
+    else:
+      var value = try: some(parseInt(text)) except ValueError: none(int)
+      if value.isSome:
+        updateUserSum(db, user.id, user.curSumName, int64(value.get()))
+      else:
+        echo "unknown ", text
+
+
+bot.startPollingThread(60, onUpdate, allowedUpdates = {UTMessage})
+
 
 proc onRequest(req: Request): Future[void] =
   if req.httpMethod == some(HttpGet):

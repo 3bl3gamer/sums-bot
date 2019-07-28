@@ -13,12 +13,12 @@ type
   Result* = object of RootObj
 
   User* = object
-    id: int64                     # Unique identifier for this user or bot
-    is_bot: bool                  # True, if this user is a bot
-    first_name: string            # User‘s or bot’s first name
-    last_name: Option[string]     # User‘s or bot’s last name
-    username: Option[string]      # User‘s or bot’s username
-    language_code: Option[string] # IETF language tag of the user's language
+    id*: int64                     # Unique identifier for this user or bot
+    is_bot*: bool                  # True, if this user is a bot
+    first_name*: string            # User‘s or bot’s first name
+    last_name*: Option[string]     # User‘s or bot’s last name
+    username*: Option[string]      # User‘s or bot’s username
+    language_code*: Option[string] # IETF language tag of the user's language
 
   ChatType*{.size: sizeof(cint).} = enum
     CTPrivate = "private"
@@ -35,16 +35,16 @@ type
                                # ...
 
   Message* = object
-    message_id: int64    # Unique message identifier inside this chat
-    `from`: Option[User] # Optional. Sender, empty for messages sent to channels
-    date: int64          # Date the message was sent in Unix time
-    chat: Chat           # Conversation the message belongs to
-    text: Option[string] # For text messages, the actual UTF-8 text of the message
-                         # ...
+    message_id*: int64    # Unique message identifier inside this chat
+    `from`*: Option[User] # Optional. Sender, empty for messages sent to channels
+    date*: int64          # Date the message was sent in Unix time
+    chat*: Chat           # Conversation the message belongs to
+    text*: Option[string] # For text messages, the actual UTF-8 text of the message
+                          # ...
 
   Update* = object of Result
-    update_id: int64
-    message: Message
+    update_id*: int64
+    message*: Message
 
   UpdateType*{.size: sizeof(cint).} = enum
     UTMessage = "message"
