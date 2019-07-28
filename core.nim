@@ -93,7 +93,17 @@ proc findOrAddUser*(db: DbConn, id: int64, firstName: string, lastName,
           values & ")"), args)
       return userFromRow(db.getRow(sql"SELECT * FROM users WHERE id = ?", id))
 
-proc updateUserSum*(db: DBConn, userId: int64, sumName: string, delta: int64) =
+proc findSumValue*(db: DBConn, userId: int64, sumName: string): Option[int64] =
+  let strValue = db.getValue(sql"""
+    SELECT value FROM sums WHERE user_id = ? AND name = ?
+    """, userId, sumName)
+  if strValue == "":
+    return none(int64)
+  else:
+    return some(int64(parseInt(strValue)))
+
+proc updateUserSum*(db: DBConn, userId: int64, sumName: string,
+    delta: int64): int64 =
   inTransaction(db):
     db.exec(sql"""
       INSERT INTO sums (user_id, name, value) VALUES (?, ?, ?)
@@ -103,7 +113,7 @@ proc updateUserSum*(db: DBConn, userId: int64, sumName: string, delta: int64) =
     db.exec(sql"""
       UPDATE users SET last_sum_name = ?, last_sum_delta = ? WHERE id = ?
       """, sumName, delta, userId)
-
+    return findSumValue(db, userId, sumName).get()
 
 proc changeUserCurSum*(db: DBConn, userId: int64, sumName: string) =
   db.exec(sql"UPDATE users SET cur_sum_name = ? WHERE id = ?", sumName, userId)

@@ -20,7 +20,7 @@ type
     username*: Option[string]      # User‘s or bot’s username
     language_code*: Option[string] # IETF language tag of the user's language
 
-  ChatType*{.size: sizeof(cint).} = enum
+  ChatType* = enum
     CTPrivate = "private"
     CTGroup = "group"
     CTSupergroup = "supergroup"
@@ -46,12 +46,17 @@ type
     update_id*: int64
     message*: Message
 
-  UpdateType*{.size: sizeof(cint).} = enum
+  UpdateType* = enum
     UTMessage = "message"
     UTEditedChannelPost = "edited_channel_post"
     UTCallbackQuery = "callback_query"
 
-  OnUpdate* = proc(update: Update) {.gcsafe.}
+  ParseMode* = enum
+    PMNone = (0, "Off")
+    PMMarkdown = (1, "Markdown")
+    PMHtml = (2, "HTML")
+
+  OnUpdate* = proc(bot:TGBot, update: Update) {.gcsafe.}
   PollThreadArgs = tuple[interval: int, allowedUpdates: set[UpdateType],
       token: string, proxy: Proxy, onUpdate: OnUpdate]
 
@@ -88,6 +93,29 @@ proc getUpdates*(bot: TGBot, offset, limit, timeout: int = 0,
   }
   return bot.sendRequest("getUpdates", params).result.to(seq[Update])
 
+proc sendMessage*(bot: TGBot, chatId: int64, text: string,
+    parseMode: ParseMode = PMNone, disabelWebPagePreview: bool = false,
+    disableNotification: bool = false, replyToMessageId: int64 = 0): Message =
+  ## chat_id                  Unique identifier for the target chat
+  ## text                     Text of the message to be sent
+  ## parse_mode               Pass `Markdown` or `HTML`, if you want Telegram apps to show bold, italic, fixed-width text or inline URLs in your bot's message
+  ## disable_web_page_preview Disables link previews for links in this message
+  ## disable_notification     Sends the message silently. Users will receive a notification with no sound
+  ## reply_to_message_id      If the message is a reply, ID of the original message
+  ##
+  ## TODO:
+  ##  chat_id as @username string
+  ##  reply_markup InlineKeyboardMarkup or ReplyKeyboardMarkup or ReplyKeyboardRemove or ForceReply
+  var params = %* {
+    "chat_id": chatId,
+    "text": text,
+  }
+  if parseMode != PMNone: params["parse_mode"] = %* parseMode
+  if disabelWebPagePreview: params["disable_web_page_preview"] = %* true
+  if disableNotification: params["disable_notification"] = %* true
+  if replyToMessageId != 0: params["reply_to_message_id"] = %* replyToMessageId
+  return bot.sendRequest("sendMessage", params).result.to(Message)
+
 proc startPoling*(bot: TGBot, interval: int, onUpdate: OnUpdate,
     allowedUpdates: set[UpdateType] = {}) =
   var lastUpdateId = 0
@@ -96,7 +124,7 @@ proc startPoling*(bot: TGBot, interval: int, onUpdate: OnUpdate,
         allowedUpdates = allowedUpdates):
       if update.update_id > lastUpdateId:
         lastUpdateId = int(update.update_id)
-      onUpdate(update)
+      onUpdate(bot, update)
 
 proc startPollingThread*(bot: TGBot, interval: int, onUpdate: OnUpdate,
     allowedUpdates: set[UpdateType] = {}) =

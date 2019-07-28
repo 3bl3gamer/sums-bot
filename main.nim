@@ -33,8 +33,10 @@ let me = bot.getMe()
 echo "TG: starting as @", me.username.get(), " aka ", me.first_name, " #", me.id
 
 
-proc onUpdate(update: Update) =
-  echo update
+proc answer(bot: TGBot, user: core.User, text: string) =
+  discard bot.sendMessage(user.id, text)
+
+proc onUpdate(bot: TGBot, update: Update) =
   let msg = update.message
   if msg.text.isSome:
     let f = msg.`from`.get()
@@ -43,22 +45,35 @@ proc onUpdate(update: Update) =
 
     if text.startsWith("/start") or text.startsWith("/help"):
       echo "start"
+
     elif text.startsWith("/cancel"):
       if user.lastSum.isSome:
-        updateUserSum(db, user.id, user.lastSum.get().name, -user.lastSum.get().delta)
+        let sum = user.lastSum.get()
+        let newValue = updateUserSum(db, user.id, sum.name, -sum.delta)
+        answer(bot, user, "Отменил, теперь\n" & sum.name & ": " & $newValue)
+      else:
+        answer(bot, user, "Отменять пока нечего.")
+
     elif text.startsWith("/use "):
-      changeUserCurSum(db, user.id, text[5 .. ^1].strip())
+      let sumName = text[5 .. ^1].strip()
+      changeUserCurSum(db, user.id, sumName)
+      let sumValue = findSumValue(db, user.id, sumName)
+      let strValue = if sumValue.isSome: $sumValue.get() else: "<пусто>"
+      answer(bot, user, "Переключился на\n" & sumName & ": " & strValue)
+
     elif text.startsWith("/"):
-      echo "unknown command ", text
+      answer(bot, user, "Не знаю такой команды.")
+
     else:
       let lines = text.split('\n', maxSplit = 2) # lines after first are ignored and may be used as comment
       let parts = lines[0].rsplit(" ", maxSplit = 2)
       let delta = try: some(int64(parseInt(parts[^1]))) except ValueError: none(int64)
       let sumName = if parts.len == 1: user.curSumName else: parts[0]
       if delta.isSome:
-        updateUserSum(db, user.id, sumName, delta.get())
+        let newValue = updateUserSum(db, user.id, sumName, delta.get())
+        answer(bot, user, sumName & ": " & $newValue)
       else:
-        echo "unknown ", text
+        answer(bot, user, "Не понял.")
 
 
 bot.startPollingThread(60, onUpdate, allowedUpdates = {UTMessage})
