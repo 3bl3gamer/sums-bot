@@ -124,7 +124,7 @@ proc updateUserSum*(db: DBConn, userId: int64, sumName: string,
     db.exec(sql"""
       INSERT INTO sums (user_id, name, value) VALUES (?, ?, ?)
       ON CONFLICT(user_id, name)
-      DO UPDATE SET value = value + excluded.value, updated_at = CURRENT_TIMESTAMP
+      DO UPDATE SET value = CAST(value + excluded.value AS INT), updated_at = CURRENT_TIMESTAMP
       """, userId, sumName, delta)
     db.exec(sql"""
       UPDATE users SET last_sum_name = ?, last_sum_delta = ? WHERE id = ?

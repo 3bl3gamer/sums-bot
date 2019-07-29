@@ -26,9 +26,7 @@ TG_BOT_TOKEN=<token> sumsbot --webhook-url="example.com/path/to/webhook"
 TG_BOT_TOKEN=<token> sumsbot --webhook-url="example.com/webhook" --webhook-cert-path="path/to/cert.pem"
 ```
 
-Из локальной копии репозитория `./run.sh` запускает бота в отладчном режиме (`nimble run` не хочет передавать аргументы внутрь команды).
-
-`nimble install` собирает в релизном режиме бинарник `sumsbot`, который можно использовать вместо `./run.sh`.
+Из локальной копии репозитория `./run.sh` запускает бота в отладчном режиме (`nimble run` не хочет передавать аргументы внутрь команды). `nimble install` собирает в релизном режиме бинарник `sumsbot`.
 
 ## Пример работы
 ```
