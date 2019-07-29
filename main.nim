@@ -29,11 +29,8 @@ while true:
 if token == "":
   raise newException(Exception, "TG_BOT_TOKEN env variable is missing")
 
-if (webhookCertPath == "") != (webhookUrl == ""):
-  raise newException(Exception, "webhook-cert-path and webhook-url must be both set or blank")
 
-
-let db = open("main.db", "", "", "")
+let db = open(getAppDir() & "/main.db", "", "", "")
 
 let proxy = if httpProxyAddr == "": nil else: newProxy(url = httpProxyAddr)
 let bot = newTGBot(token, proxy)
@@ -115,8 +112,8 @@ proc onUpdate(bot: TGBot, update: Update) =
       answer(bot, user, "Не знаю такой команды.")
 
     else:
-      let lines = text.split('\n', maxSplit = 2) # lines after first are ignored and may be used as comment
-      let parts = lines[0].rsplit(" ", maxSplit = 2)
+      let lines = text.split('\n', maxSplit = 1) # lines after first are ignored and may be used as comment
+      let parts = lines[0].rsplit(" ", maxSplit = 1)
       let delta = try: some(int64(parseInt(parts[^1]))) except ValueError: none(int64)
       let sumName = if parts.len == 1: user.curSumName else: parts[0]
       if delta.isSome:
@@ -126,13 +123,13 @@ proc onUpdate(bot: TGBot, update: Update) =
         answer(bot, user, "Не понял.")
 
 
-if webhookCertPath == "" or webhookUrl == "":
+if webhookUrl == "":
   discard bot.deleteWebhook()
   # bot.startPollingThread(60, onUpdate, allowedUpdates = {UTMessage})
   bot.startPoling(60, onUpdate, allowedUpdates = {UTMessage})
 else:
-  let cert = readFile(webhookCertPath)
-  discard bot.setWebhook(webhookUrl, some(cert), allowedUpdates = {UTMessage})
+  let cert = if webhookCertPath == "": none(string) else: some(readFile(webhookCertPath))
+  discard bot.setWebhook(webhookUrl, cert, allowedUpdates = {UTMessage})
   var bots = initTable[int, TGBot]()
 
   proc onRequest(req: Request): Future[void] =
