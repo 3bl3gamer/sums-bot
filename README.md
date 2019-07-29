@@ -46,3 +46,36 @@ the Answer: 42
 the Answer: 42
 могу отменить (/cancel)
 ```
+
+## Всякое
+
+### /etc/nginx/nginx.conf
+```
+server {
+    listen 8443 ssl http2;
+
+    ssl_certificate /etc/nginx/ssl/sums_bot_cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/sums_bot_key.pem;
+
+    location /sums_bot_secret_webhook {
+        proxy_pass http://127.0.0.1:9003/webhook;
+    }
+}
+```
+
+### /etc/systemd/system/sumsbot.service
+```
+[Unit]
+Description=SumsBot
+After=network.target
+
+[Service]
+User=sums
+WorkingDirectory=/home/sums
+Environment="TG_BOT_TOKEN=<key>"
+ExecStart=subsbot --webhook-cert-path=/etc/nginx/ssl/sums_bot_cert.pem --webhook-url=https://example.com/webhook'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```

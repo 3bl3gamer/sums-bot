@@ -30,7 +30,7 @@ if token == "":
   raise newException(Exception, "TG_BOT_TOKEN env variable is missing")
 
 
-let db = open(getAppDir() & "/main.db", "", "", "")
+let db = open("main.db", "", "", "")
 
 let proxy = if httpProxyAddr == "": nil else: newProxy(url = httpProxyAddr)
 let bot = newTGBot(token, proxy)
