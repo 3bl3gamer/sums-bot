@@ -98,17 +98,21 @@ proc onUpdate(bot: TGBot, update: Update) =
       else:
         answer(bot, user, "Отменять пока нечего.")
 
-    elif text.startsWith("/use "):
-      let sumName = text[5 .. ^1].strip()
+    elif text.startsWith("/use"):
+      var sumName = text[4 .. ^1].strip()
+      if sumName == "": sumName = "default"
       changeUserCurSum(db, user.id, sumName)
       let sumValue = findSumValue(db, user.id, sumName)
       let strValue = if sumValue.isSome: $sumValue.get() else: "<пусто>"
       answer(bot, user, "Переключился на\n" & sumName & ": " & strValue)
 
-    elif text.startsWith("/del "):
-      let sumName = text[5 .. ^1].strip()
-      let removed = removeUserSum(db, user.id, sumName)
-      answer(bot, user, if removed: "Удалил." else: "Такой суммы нет.")
+    elif text.startsWith("/del"):
+      let sumName = text[4 .. ^1].strip()
+      if sumName == "":
+        answer(bot, user, "Назвние суммы обязательно. Например `/del default`.", true)
+      else:
+        let removed = removeUserSum(db, user.id, sumName)
+        answer(bot, user, if removed: "Удалил." else: "Такой суммы нет.")
 
     elif text.startsWith("/"):
       answer(bot, user, "Не знаю такой команды.")
