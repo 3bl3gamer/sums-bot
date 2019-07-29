@@ -1,2 +1,2 @@
 #!/bin/sh
-nim c -r main.nim $@
+nimble c src/sumsbot --outDir:. && ./sumsbot $@
