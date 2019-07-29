@@ -74,7 +74,9 @@ proc onUpdate(bot: TGBot, update: Update) =
       answer(bot, user, msg, true)
 
     elif text.startsWith("/info"):
-      let sumRows = findUserSums(db, user.id).mapIt(it.name & ": " & $it.value)
+      let sumRows = findUserSums(db, user.id)
+        .mapIt(it.name & ": " & $it.value &
+               (if it.name == user.curSumName: " (текущая)" else: ""))
       var msg = if sumRows.len == 0: "*Сумм нет.*"
         else: "*Все суммы:*\n" & sumRows.join("\n")
 
