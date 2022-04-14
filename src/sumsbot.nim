@@ -151,4 +151,4 @@ else:
     else:
       req.send(Http404)
 
-  run(onRequest, Settings(port: Port(9003)))
+  run(onRequest, initSettings(bindAddr = "127.0.0.1", port = Port(9003)))
